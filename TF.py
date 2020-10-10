@@ -112,8 +112,9 @@ num_rows = 40
 num_columns = 174
 num_channels = 1
 
-x_train = x_train.reshape(x_train.shape[0], num_rows, num_columns, num_channels)
-x_test = x_test.reshape(x_test.shape[0], num_rows, num_columns, num_channels)
+#x_train = x_train.reshape(x_train.shape[0], num_rows, num_columns, num_channels)
+#x_test = x_test.reshape(x_test.shape[0], num_rows, num_columns, num_channels)
+
 
 num_labels = yy.shape[1]
 filter_size = 2
@@ -138,20 +139,17 @@ model.add(Dropout(0.2))
 model.add(GlobalAveragePooling2D())
 
 model.add(Dense(num_labels, activation='softmax'))
-
-
 ##########################################################################
 
+print("yy")
 model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam')
-
 # Display model architecture summary 
 model.summary()
-
+print("y")
 # Calculate pre-training accuracy 
-score = model.evaluate(x_test, y_test, verbose=1)
+score = model.evaluate(x_test, y_test, verbose=0)
 accuracy = 100*score[1]
-
-print("Pre-training accuracy: %.4f%%" % accuracy) 
+print("Pre-training accuracy: %.4f%%" % accuracy)
 
 ########################################################################33
 
