@@ -1,7 +1,20 @@
+TENSOR GPU ACCELERATION:
 pip install tf-nightly
+CDNN
+CUDA TOOLKIT 10.1
 
-
+Add this line to your cmd path
 SET PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1\bin;%PATH%
 SET PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1\extras\CUPTI\lib64;%PATH%
 SET PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1\include;%PATH%
 SET PATH=C:\tools\cuda\bin;%PATH%
+
+pip install:
+numpy
+matplotlib
+tensorflow
+keras
+sklearn
+pandas
+librosa
+speechRecognition

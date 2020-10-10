@@ -1,36 +1,57 @@
-import pandas as pd
 import os
-import librosa
-import librosa.display
-import struct
 import time
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split 
-from keras.utils import to_categorical
+import struct
+import librosa
+import tensorflow
 import numpy as np
+import pandas as pd
+import librosa.display
 import matplotlib.pyplot as plt
+import speech_recognition as sr
+
+from gtts import gTTS
+from datetime import datetime 
+from pydub import AudioSegment
+from playsound import playsound
+
+from keras import layers
+from keras.utils import np_utils
+from keras.optimizers import Adam
 from keras.models import Sequential
+from keras.utils import to_categorical
+from keras.callbacks import ModelCheckpoint 
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Convolution2D, Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.optimizers import Adam
-from keras.utils import np_utils
-from keras import layers
-from sklearn import metrics 
-from keras.callbacks import ModelCheckpoint 
-from datetime import datetime 
 
-import speech_recognition as sr
+from sklearn import metrics 
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split 
+
+def create_audio(audio):
+    #language = 'en'
+    #tts = gTTS(text=audio, lang=language, slow=False) 
+    #tts.save('sample.wav')
+    tts = gTTS(audio)
+    print("trying to import file1")
+    if os.remove('read.mp3'): os.remove('read.mp3')
+    tts.save('read.mp3')
+    print("trying to import file2")
+    sound = AudioSegment.from_mp3("./read.mp3")
+    print("trying to import file3")
+    sound.export("read.wav", format="wav")
 
 def microphone_check():
     #Habilita o microfone para ouvir o usuario
     microfone = sr.Recognizer()
     with sr.Microphone() as source:
         microfone.adjust_for_ambient_noise(source)
-        runListening()
         print("pode falar")
         audio = microfone.listen(source)
-        return audio
-
+        try:
+            frase = microfone.recognize_google(audio,language='pt-BR')
+            return frase.casefold()
+        except sr.UnknownValueError:
+            return "não entendi"
 
 class WavFileHelper():
     
@@ -52,155 +73,104 @@ class WavFileHelper():
 
         return (num_channels, sample_rate, bit_depth)
 
-
-
-def super_extract_features(audio):
-    try:        
-        #print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-        #print(audio)
-        #print(sample_rate)
-        #fig = plt.figure(figsize=(15,15))
-        #fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        #librosa.display.waveplot(audio, sr= sample_rate)
-        #plt.savefig('class_examples.png')                
-        #time.sleep(3)
-        
-        mfccs = librosa.feature.mfcc(y=audio, sr=22050, n_mfcc=40)
-        mfccsscaled = np.mean(mfccs.T,axis=0) #erro nesta linha
-    except Exception as e:
-        print("Error encountered while parsing file: ", file_name)
-        return None 
-    return mfccsscaled
-
 def extract_features(file_name):
-    try:
-        audio, sample_rate = librosa.load(file_name, res_type='kaiser_fast') 
-        
-        #print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-        #print(audio)
-        #print(sample_rate)
-        #fig = plt.figure(figsize=(15,15))
-        #fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        #librosa.display.waveplot(audio, sr= sample_rate)
-        #plt.savefig('class_examples.png')                
-        #time.sleep(3)
-        
-        mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=40)
-        mfccsscaled = np.mean(mfccs.T,axis=0) #erro nesta linha
-    except Exception as e:
-        print("Error encountered while parsing file: ", file_name)
-        return None 
+    audio, sample_rate = librosa.load(file_name, res_type='kaiser_fast') 
+    mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=40)
+    mfccsscaled = np.mean(mfccs.T,axis=0) #erro nesta linha
     return mfccsscaled
-   
+ 
+def returnAmplitueAndTagInfoList(fulldatasetpath, metadata):
+    features = []
+    for index, row in metadata.iterrows():
+        file_name = row['file_name']
+        class_label = row['tag']
+        data = extract_features(fulldatasetpath+file_name)
+        features.append([data, class_label])
+    return features   
+ 
+def retrieveMetaData(file):
+    metadata = pd.read_csv(file)    
+    return metadata
 
-# Set the path to the full UrbanSound dataset 
-fulldatasetpath = './Data/'
+def transformDataFrameIntoNumpyArray(featuresdf):
+    # Convert features and corresponding classification labels into numpy arrays
+    print("A")
+    featuresdf.iloc[0]['feature']
+    print("b")
+    x = np.array(featuresdf.feature.tolist())
+    print("c")
+    y = np.array(featuresdf.class_label.tolist())
+    print("d") 
+    le = LabelEncoder()
+    print("e")
+    yy = to_categorical(le.fit_transform(y)) 
+    print("f")
+    return x, y, yy
 
-metadata = pd.read_csv('information.csv')
-features = []
+def createMachineLearnModel(x_test, yy):
+    num_labels = yy.shape[1]
+    model = Sequential()
+    model.add(Dense(256))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(256))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_labels))
+    model.add(Activation('softmax'))
+    # Compile the model
+    model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam')
+    model.build(input_shape=[x_test.shape[0],x_test.shape[1]])    
+    model.summary()
+    return model
+    
+def lookForPreTrainAccuracy(model, x_test, y_test):
+    score = model.evaluate(x_test, y_test, verbose=0)
+    accuracy = 100*score[1]
+    print("Pre-training accuracy: %.4f%%" % accuracy)    
 
-## Iterate through each sound file and extract the features 
-for index, row in metadata.iterrows():
-    file_name = row['file_name']
-    class_label = row['tag']
-    data = extract_features(fulldatasetpath+file_name)
-    features.append([data, class_label])
-    print("a")
+def trainingModel(model,x_train, y_train, x_test, y_test):
+    num_epochs = 100
+    num_batch_size = 32
+    model.fit(x_train, y_train, batch_size=num_batch_size, epochs=num_epochs, validation_data=(x_test, y_test), verbose=1)
 
-# Convert into a Panda dataframe 
-featuresdf = pd.DataFrame(features, columns=['feature','class_label'])
-print("TABLE")
-print(featuresdf.head())
-print("A")
-print(featuresdf.iloc[0]['feature'])
+def lookForPostTrainAccuracy(model, x_train, y_train, x_test, y_test):
+    # Evaluating the model on the training and testing set
+    score = model.evaluate(x_train, y_train, verbose=0)
+    print("Training Accuracy: {0:.2%}".format(score[1]))
+    score = model.evaluate(x_test, y_test, verbose=0)
+    print("Testing Accuracy: {0:.2%}".format(score[1]))
 
-# Convert features and corresponding classification labels into numpy arrays
-x = np.array(featuresdf.feature.tolist())
-y = np.array(featuresdf.class_label.tolist())
+def main():
+    saved = False   
+    if saved == True:   
+        model = tensorflow.keras.models.load_model("64x3-CNN.model")
+    else:
+        fulldatasetpath = './Data/'
+        metadata = retrieveMetaData('MetaData/information.csv')
+        features = returnAmplitueAndTagInfoList(fulldatasetpath, metadata)
+        featuresdf = pd.DataFrame(features, columns=['feature','class_label'])
+        x, y, yy = transformDataFrameIntoNumpyArray(featuresdf)
+        x_train, x_test, y_train, y_test = train_test_split(x, yy, test_size=0.2, random_state = 42)
+        model = createMachineLearnModel(x_test, yy)
+        lookForPreTrainAccuracy(model, x_test, y_test)
+        trainingModel(model,x_train, y_train, x_test, y_test)
+        lookForPostTrainAccuracy(model, x_train, y_train, x_test, y_test)
+        model.save('64x3-CNN.model')
+    #t1 = microphone_check()
+    #text = "house"
+    #aud = create_audio(text)
+    #audio1 = extract_features("house_28.wav")
+    #audio1 = extract_features("H3.wav")
+    #print(audio1)
+    #x = np.array(audio1.tolist())
+    #print(x.shape)
+    #x = x.reshape(1,40)
+    #print(x.shape)
+    #print(audio1)
+    #audio2 = extract_features("house_28.wav")
+    #L1 = model.predict(x)
+    #print(L1)
 
-le = LabelEncoder()
-yy = to_categorical(le.fit_transform(y)) 
-
-print("TREINAMENTO STUFF")
-x_train, x_test, y_train, y_test = train_test_split(x, yy, test_size=0.2, random_state = 42)
-
-###########################################################################3
-
-print("###########################################################################")
-print("EH ESSE AQUI PORRA = ", x_train.shape)
-print(x_test.shape)
-print(yy.shape)
-print(y_train.shape)
-print(y_test.shape)
-print("###########################################################################")
-
-num_labels = yy.shape[1]
-
-model = Sequential()
-model.add(Dense(256))
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-model.add(Dense(256))
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-model.add(Dense(num_labels))
-model.add(Activation('softmax'))
-# Compile the model
-model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam')
-model.build(input_shape=[x_test.shape[0],x_test.shape[1]])
-
-# Display model architecture summary
-
-########################################################################33
-
-# Display model architecture summary 
-print(model)
-
-model.summary()
-
-# Calculate pre-training accuracy 
-score = model.evaluate(x_test, y_test, verbose=0)
-accuracy = 100*score[1]
-
-
-
-
-print("Pre-training accuracy: %.4f%%" % accuracy)
-
-
-
-
-from keras.callbacks import ModelCheckpoint 
-from datetime import datetime 
-
-num_epochs = 100
-num_batch_size = 32
-
-model.fit(x_train, y_train, batch_size=num_batch_size, epochs=num_epochs, validation_data=(x_test, y_test), verbose=1)
-
-
-# Evaluating the model on the training and testing set
-score = model.evaluate(x_train, y_train, verbose=0)
-print("Training Accuracy: {0:.2%}".format(score[1]))
-
-score = model.evaluate(x_test, y_test, verbose=0)
-print("Testing Accuracy: {0:.2%}".format(score[1]))
-
-print("teste1")
-t1 = microphone_check()
-print("teste2")
-t2 = microphone_check()
-print("teste3")
-t3 = microphone_check()
-print("teste4")
-t4 = microphone_check()
-
-L1 = model.predict(super_extract_features(t1))
-L2 = model.predict(super_extract_features(t2))
-L3 = model.predict(super_extract_features(t3))
-L4 = model.predict(super_extract_features(t4))
-
-print(L1)
-print(L2)
-print(L3)
-print(L4)
+if __name__ == '__main__': # chamada da funcao principal
+    main()
