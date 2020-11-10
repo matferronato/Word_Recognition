@@ -9,6 +9,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import speech_recognition as sr
 
+from PIL import Image
 from gtts import gTTS
 from datetime import datetime 
 from pydub import AudioSegment
@@ -33,26 +34,16 @@ def extract_features(file_name):
     mfccsscaled = np.mean(mfccs.T,axis=0) #erro nesta linha
     return mfccsscaled
 
-def normalize(x_train):
-    x_train_means = x_train.mean(axis=0)
-    x_train_stds = x_train.std(axis=0)
-    x_train = x_train - x_train_means
-    x_train = x_train/x_train_stds
-
-
 def testML(): 
-    possibleTags = ["bed", "bird", "cat", "dog", "down", "go", "happy", "house", "left", "marvel", "no", "off", "on", "right", "stop", "up", "wow", "yes"]
+    possibleTags = ["happy","right","wow"]
     model = tensorflow.keras.models.load_model("64x3-CNN.model")
     audio = extract_features("demo.wav")
     print("Audio\n",audio)
     x = np.array(audio.tolist())
-    normalize(x)
-    print(x)
     print("original shape\n",x.shape)
     x = x.reshape(1,40)
     print("new shape\n",x.shape)
     L1 = model.predict(x)
-    
     L1List = []
     for eachList in L1:
         for eachItem in eachList:
@@ -64,6 +55,18 @@ def testML():
     indexOfPrediction = L1List.index(prediction)
     print(indexOfPrediction)
     tag = possibleTags[indexOfPrediction]
-    
     print("predicted ", tag, " with ", str(L1List[indexOfPrediction]*100) ," % certain" )
     
+    if ((L1List[indexOfPrediction]*100)<70):
+        print("Não entendi")
+    else:
+        if (tag == "happy"):
+            i1 = Image.open("./images/happy.png")
+        elif (tag == "wow"):
+            i1 = Image.open("./images/wow.jpg")
+        else:
+            i1 = Image.open("./images/rigth.png")
+        plt.imshow(i1)
+        plt.show(block=False)
+        plt.axis('off')
+        plt.pause(5)

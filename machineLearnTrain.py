@@ -60,7 +60,6 @@ def returnAmplitueAndTagInfoList(fulldatasetpath, metadata):
         class_label = row['tag']
         data = extract_features(fulldatasetpath+file_name)
         features.append([data, class_label])
-        print(file_name)
     return features   
  
 def retrieveMetaData(file):
@@ -69,27 +68,28 @@ def retrieveMetaData(file):
 
 def transformDataFrameIntoNumpyArray(featuresdf):
     # Convert features and corresponding classification labels into numpy arrays
+    print("A")
     featuresdf.iloc[0]['feature']
+    print("b")
     x = np.array(featuresdf.feature.tolist())
+    print("c")
     y = np.array(featuresdf.class_label.tolist())
-    print(y)
+    print("d") 
     le = LabelEncoder()
-    print(le.fit_transform(y))
-    print(to_categorical(le.fit_transform(y)))
+    print("e")
     yy = to_categorical(le.fit_transform(y)) 
+    print("f")
     return x, y, yy
 
 def createMachineLearnModel(x, yy):
     num_labels = yy.shape[1]
     model = Sequential()
-    model.add(Dense(64))
+    model.add(Dense(256))
     model.add(Activation('relu'))
-    #model.add(Dense(256))
-    #model.add(Activation('relu'))
-    #model.add(Dropout(0.5))
-    #model.add(Dense(256))
-    #model.add(Activation('relu'))
-    #model.add(Dropout(0.5))
+    model.add(Dropout(0.5))
+    model.add(Dense(256))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(num_labels))
     model.add(Activation('softmax'))
     # Compile the model
@@ -115,19 +115,6 @@ def lookForPostTrainAccuracy(model, x_train, y_train, x_test, y_test):
     score = model.evaluate(x_test, y_test, verbose=0)
     print("Testing Accuracy: {0:.2%}".format(score[1]))
 
-def normalize(x_train, x_test):
-    x_train_means = x_train.mean(axis=0)
-    x_train_stds = x_train.std(axis=0)
-    x_train = x_train - x_train_means
-    x_train = x_train/x_train_stds
-
-    x_test_means = x_test.mean(axis=0)
-    x_test_stds = x_test.std(axis=0)
-    x_test = x_test - x_test_means
-    x_test = x_test/x_test_stds
-
-
-
 def trainML():
     fulldatasetpath = './Data/'
     metadata = retrieveMetaData('MetaData/information.csv')
@@ -135,7 +122,6 @@ def trainML():
     featuresdf = pd.DataFrame(features, columns=['feature','class_label'])
     x, y, yy = transformDataFrameIntoNumpyArray(featuresdf)
     x_train, x_test, y_train, y_test = train_test_split(x, yy, test_size=0.2, random_state = 42)
-    normalize(x_train, x_test)
     model = createMachineLearnModel(x_train, yy)
     lookForPreTrainAccuracy(model, x_test, y_test)
     trainingModel(model,x_train, y_train, x_test, y_test)
